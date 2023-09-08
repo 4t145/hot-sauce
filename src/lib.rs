@@ -17,10 +17,10 @@ impl Version {
 /// let source = HotSource::<str>::new("hello world");
 /// let mut hot_str = source.get();
 /// source.update("hello hotsauce");
-/// assert!(hot.is_expired());
+/// assert!(hot_str.is_expired());
 /// hot_str.sync();
-/// assert!(!hot.is_expired());
-/// assert_eq!(&*hot, "hello hotsauce");
+/// assert!(!hot_str.is_expired());
+/// assert_eq!(&*hot_str, "hello hotsauce");
 /// ```
 #[derive(Debug)]
 pub struct HotSource<T: ?Sized> {
