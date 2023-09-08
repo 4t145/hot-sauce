@@ -20,7 +20,7 @@ impl Version {
 /// assert!(hot.is_expired());
 /// hot_str.sync();
 /// assert!(!hot.is_expired());
-/// assert_eq!(&**hot, "hello hotsauce");
+/// assert_eq!(&*hot, "hello hotsauce");
 /// ```
 #[derive(Debug)]
 pub struct HotSource<T: ?Sized> {
@@ -101,8 +101,14 @@ impl<T: ?Sized> Hot<T> {
 }
 
 impl<T: ?Sized> std::ops::Deref for Hot<T> {
-    type Target = Arc<T>;
+    type Target = T;
     fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<T: ?Sized> AsRef<T> for Hot<T> {
+    fn as_ref(&self) -> &T {
         &self.data
     }
 }
@@ -115,7 +121,7 @@ fn test() {
     assert!(hot.is_expired());
     hot.sync();
     assert!(!hot.is_expired());
-    assert_eq!(&**hot, "hello hotsauce");
+    assert_eq!(hot.as_ref(), "hello hotsauce");
 }
 
 #[test]
@@ -135,6 +141,6 @@ fn test_multi_thread() {
     for _ in 0..10 {
         thread::sleep(std::time::Duration::from_millis(50));
         message.sync();
-        println!("{}", &**message);
+        println!("{}", &*message);
     }
 }
