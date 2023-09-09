@@ -24,7 +24,7 @@ impl Version {
 /// ```
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-struct HotSource<T: ?Sized>(Arc<HotSourceInner<T>>);
+pub struct HotSource<T: ?Sized>(Arc<HotSourceInner<T>>);
 
 impl<T: ?Sized> HotSource<T> {
     pub fn new(data: impl Into<Arc<T>>) -> Self {
