@@ -22,15 +22,33 @@ impl Version {
 /// assert!(!hot_str.is_expired());
 /// assert_eq!(&*hot_str, "hello hotsauce");
 /// ```
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+struct HotSource<T: ?Sized>(Arc<HotSourceInner<T>>);
+
+impl<T: ?Sized> HotSource<T> {
+    pub fn new(data: impl Into<Arc<T>>) -> Self {
+        HotSource(HotSourceInner::new(data))
+    }
+}
+
+impl<T: ?Sized> std::ops::Deref for HotSource<T> {
+    type Target = Arc<HotSourceInner<T>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Debug)]
-pub struct HotSource<T: ?Sized> {
+pub struct HotSourceInner<T: ?Sized> {
     /// version is used to check if the data is expired
     version: Version,
     /// data is the actual data
     data: RwLock<Arc<T>>,
 }
 
-impl<T: ?Sized> HotSource<T> {
+impl<T: ?Sized> HotSourceInner<T> {
     /// create a new hot source
     pub fn new(data: impl Into<Arc<T>>) -> Arc<Self> {
         Arc::new(Self {
@@ -38,6 +56,7 @@ impl<T: ?Sized> HotSource<T> {
             data: RwLock::new(data.into()),
         })
     }
+
     /// update value from source
     pub fn update(&self, new_data: impl Into<Arc<T>>) {
         {
@@ -59,12 +78,26 @@ impl<T: ?Sized> HotSource<T> {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<'de, T: ?Sized> serde::Deserialize<'de> for HotSource<T>
+where
+    T: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let data = T::deserialize(deserializer)?;
+        Ok(Self::new(data))
+    }
+}
+
 /// A `Hot` pointer is used to wrap a dynamically updated data
 #[derive(Debug, Clone)]
 pub struct Hot<T: ?Sized> {
     version: usize,
     data: Arc<T>,
-    source: Arc<HotSource<T>>,
+    source: Arc<HotSourceInner<T>>,
 }
 
 impl<T: ?Sized> Hot<T> {
@@ -110,6 +143,18 @@ impl<T: ?Sized> std::ops::Deref for Hot<T> {
 impl<T: ?Sized> AsRef<T> for Hot<T> {
     fn as_ref(&self) -> &T {
         &self.data
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: ?Sized> serde::Serialize for Hot<T>
+where
+    T: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        self.get().serialize(serializer)
     }
 }
 
