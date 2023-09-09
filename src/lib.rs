@@ -101,6 +101,9 @@ pub struct Hot<T: ?Sized> {
 }
 
 impl<T: ?Sized> Hot<T> {
+    pub fn new(data: impl Into<Arc<T>>) -> Self {
+        HotSource::new(data).get()
+    }
     /// update the pointee content
     pub fn update(&mut self, new_data: impl Into<Arc<T>>) {
         self.source.update(new_data.into());
@@ -156,6 +159,20 @@ where
         S: serde::Serializer,
     {
         self.get().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T: ?Sized> serde::Deserialize<'de> for Hot<T>
+where
+    T: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let data = T::deserialize(deserializer)?;
+        Ok(Self::new(data))
     }
 }
 
