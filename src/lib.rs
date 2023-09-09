@@ -3,9 +3,11 @@ use std::sync::{atomic::AtomicUsize, Arc, RwLock};
 struct Version(AtomicUsize);
 
 impl Version {
+    #[inline]
     fn inc(&self) {
         self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
+    #[inline]
     fn get(&self) -> usize {
         self.0.load(std::sync::atomic::Ordering::Relaxed)
     }
@@ -93,11 +95,21 @@ where
 }
 
 /// A `Hot` pointer is used to wrap a dynamically updated data
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Hot<T: ?Sized> {
     version: usize,
     data: Arc<T>,
     source: Arc<HotSourceInner<T>>,
+}
+
+impl<T: ?Sized> Clone for Hot<T> {
+    fn clone(&self) -> Self {
+        Self {
+            version: self.version,
+            data: self.data.clone(),
+            source: self.source.clone(),
+        }
+    }
 }
 
 impl<T: ?Sized> Hot<T> {
@@ -149,6 +161,12 @@ impl<T: ?Sized> AsRef<T> for Hot<T> {
     }
 }
 
+impl<T: ?Sized> From<Hot<T>> for Arc<T> {
+    fn from(val: Hot<T>) -> Self {
+        val.data
+    }
+}
+
 #[cfg(feature = "serde")]
 impl<T: ?Sized> serde::Serialize for Hot<T>
 where
@@ -178,8 +196,8 @@ where
 
 #[test]
 fn test() {
-    let source = HotSource::<str>::new("hello world");
-    let mut hot = source.get();
+    let mut source = Hot::<str>::new("hello world");
+    let mut hot = source.clone();
     source.update("hello hotsauce");
     assert!(hot.is_expired());
     hot.sync();
