@@ -1,4 +1,16 @@
 # Hot-Sauce
+
+[![Crates.io][crates-badge]][crates-url]
+[![Publish][ci-publish-badge]][ci-publish-url]
+[![Build][ci-build-badge]][ci-build-url]
+
+[crates-badge]: https://img.shields.io/crates/v/hot-sauce.svg
+[crates-url]: https://crates.io/crates/hot_sauce
+[ci-publish-badge]: https://github.com/4t145/hot-sauce/actions/workflows/publish.yml/badge.svg?branch=publish
+[ci-publish-url]: https://github.com/4t145/hot-sauce/actions/workflows/publish.yml/?branch=publish
+[ci-build-badge]: https://github.com/4t145/hot-sauce/actions/workflows/rust.yml/badge.svg?branch=master
+[ci-build-url]: https://github.com/4t145/hot-sauce/actions/workflows/rust.yml/?branch=master
+
 It's wrapper to allow you dynamic update some data like config. 
 
 You can sync the data to the newest version or get cached data of last sync, or publish a data.
