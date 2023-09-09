@@ -6,8 +6,8 @@
 
 [crates-badge]: https://img.shields.io/crates/v/hot-sauce.svg
 [crates-url]: https://crates.io/crates/hot_sauce
-[ci-publish-badge]: https://github.com/4t145/hot-sauce/actions/workflows/publish.yml/badge.svg?branch=publish
-[ci-publish-url]: https://github.com/4t145/hot-sauce/actions/workflows/publish.yml/?branch=publish
+[ci-publish-badge]: https://github.com/4t145/hot-sauce/actions/workflows/publish.yml/badge.svg?branch=release
+[ci-publish-url]: https://github.com/4t145/hot-sauce/actions/workflows/publish.yml/?branch=release
 [ci-build-badge]: https://github.com/4t145/hot-sauce/actions/workflows/rust.yml/badge.svg?branch=master
 [ci-build-url]: https://github.com/4t145/hot-sauce/actions/workflows/rust.yml/?branch=master
 
