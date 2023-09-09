@@ -11,16 +11,17 @@
 [ci-build-badge]: https://github.com/4t145/hot-sauce/actions/workflows/rust.yml/badge.svg?branch=master
 [ci-build-url]: https://github.com/4t145/hot-sauce/actions/workflows/rust.yml/?branch=master
 
-It's wrapper to allow you dynamic update some data like config. 
+It's wrapper to allow you dynamic update some data like config.
 
-You can sync the data to the newest version or get cached data of last sync, or publish a data.
-
+You can sync the data to the newest version or get cached data of last sync, or
+publish a data.
 
 ```bash
 cargo add hot-sauce
 ```
 
 ## Usage
+
 ```rust
 pub fn main() {
     use std::thread;
@@ -42,3 +43,14 @@ pub fn main() {
     }
 }
 ```
+
+## Using `serde`
+
+Support `serde` by enable `serde` feature
+
+```toml
+hot_sauce = { version = "*", features = ["serde"] }
+```
+
+- `HotSource<T>` can be deserialized from T
+- `Hot<T>` can be serialized into T
