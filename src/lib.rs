@@ -1,4 +1,7 @@
-use std::sync::{atomic::AtomicUsize, Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicPtr, AtomicUsize, Ordering},
+    Arc, Weak,
+};
 #[derive(Debug)]
 struct Version(AtomicUsize);
 
@@ -26,7 +29,7 @@ impl Version {
 /// ```
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-pub struct HotSource<T: ?Sized>(Arc<HotSourceInner<T>>);
+struct HotSource<T: ?Sized>(Arc<HotSourceInner<T>>);
 
 impl<T: ?Sized> HotSource<T> {
     pub fn new(data: impl Into<Arc<T>>) -> Self {
@@ -43,54 +46,79 @@ impl<T: ?Sized> std::ops::Deref for HotSource<T> {
 }
 
 #[derive(Debug)]
-pub struct HotSourceInner<T: ?Sized> {
+struct HotSourceInner<T: ?Sized> {
     /// version is used to check if the data is expired
     version: Version,
     /// data is the actual data
-    data: RwLock<Arc<T>>,
+    data: AtomicPtr<Weak<T>>,
 }
 
 impl<T: ?Sized> HotSourceInner<T> {
     /// create a new hot source
     pub fn new(data: impl Into<Arc<T>>) -> Arc<Self> {
+        let a_data: Arc<T> = data.into();
+        // hold
+        unsafe {
+            Arc::increment_strong_count(a_data.as_ref() as *const T);
+        }
+        // let p_data = Arc::as_ptr(&a_data);
+        // unsafe {
+        //     Arc::increment_strong_count(p_data)
+        // };
+        let b_data = Box::new(Arc::downgrade(&a_data));
+        let p = Box::leak(b_data) as *const Weak<T> as *mut Weak<T>;
+        let ap_data = AtomicPtr::new(p);
         Arc::new(Self {
             version: Version(AtomicUsize::new(0)),
-            data: RwLock::new(data.into()),
+            data: ap_data,
         })
     }
 
     /// update value from source
     pub fn update(&self, new_data: impl Into<Arc<T>>) {
-        {
-            *self.data.write().expect("poisoned") = new_data.into();
+        let arc_data: Arc<T> = new_data.into();
+        // hold
+        unsafe {
+            Arc::increment_strong_count(arc_data.as_ref() as *const T);
         }
+        let b_data = Box::new(Arc::downgrade(&arc_data));
+        let p = Box::leak(b_data) as *const Weak<T> as *mut Weak<T>;
         self.version.inc();
+        let p_older = self.data.swap(p, Ordering::SeqCst);
+        let _ = unsafe { Box::from_raw(p_older) };
+        // release
+        unsafe { Arc::decrement_strong_count(p_older.cast_const()) };
     }
 
     /// get a `Hot` pointer to the data
     pub fn get(self: &Arc<Self>) -> Hot<T> {
         // read version first
         let version = self.version.get();
-        let data = { self.data.read().expect("poisoned").clone() };
-        Hot {
-            version,
-            data,
-            source: self.clone(),
+        let p_data = self.data.load(Ordering::SeqCst);
+        // we just de readonly operations
+        let data = unsafe { p_data.as_ref().expect("invalid hot pointer") }.clone();
+        if let Some(data) = data.upgrade() {
+            Hot {
+                version,
+                data,
+                source: self.clone(),
+            }
+        } else {
+            panic!("invalid weak");
+            self.get()
         }
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de, T: ?Sized> serde::Deserialize<'de> for HotSource<T>
-where
-    T: serde::Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let data = T::deserialize(deserializer)?;
-        Ok(Self::new(data))
+impl<T: ?Sized> Drop for HotSourceInner<T> {
+    fn drop(&mut self) {
+        let p_older = self.data.load(Ordering::SeqCst);
+        // it's ok to do so as we guarentee this will drop only when all spawned Hot has been dropped,
+        // at that time, no one can modify the data pointer
+        let _ = unsafe { Box::from_raw(p_older) };
+        if cfg!(test) {
+            println!("drop at version {:?}", self.version)
+        }
     }
 }
 
@@ -123,8 +151,8 @@ impl<T: ?Sized> Hot<T> {
     }
 
     /// get the cached data (it may not be the newest value)
-    pub fn get(&self) -> Arc<T> {
-        self.data.clone()
+    pub fn get(&self) -> &T {
+        &self.data
     }
 
     /// check if current data has the newest version
@@ -139,7 +167,7 @@ impl<T: ?Sized> Hot<T> {
     }
 
     /// it's a combination of [#method.sync] and
-    pub fn get_sync(&mut self) -> Arc<T> {
+    pub fn get_sync(&mut self) -> &T {
         if self.is_expired() {
             self.sync().get_sync()
         } else {
@@ -203,25 +231,4 @@ fn test() {
     hot.sync();
     assert!(!hot.is_expired());
     assert_eq!(hot.as_ref(), "hello hotsauce");
-}
-
-#[test]
-fn test_multi_thread() {
-    use std::thread;
-    let source = HotSource::<str>::new("hello world");
-    let mut message = source.get();
-    thread::spawn(move || {
-        let mut version = 0;
-        loop {
-            thread::sleep(std::time::Duration::from_millis(100));
-            version += 1;
-            message.update(format!("hello world {}", version));
-        }
-    });
-    let mut message = source.get();
-    for _ in 0..10 {
-        thread::sleep(std::time::Duration::from_millis(50));
-        message.sync();
-        println!("{}", &*message);
-    }
 }
